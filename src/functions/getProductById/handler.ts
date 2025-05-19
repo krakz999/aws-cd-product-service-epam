@@ -1,12 +1,14 @@
-import { getProductById } from "../../mocks/products";
+import { ProductRepository } from "../../repositories/product-repository";
+import { StockRepository } from "../../repositories/stock-repository";
+import { ProductService } from "../../services/product-service";
 
-export default async function (event: any): Promise<any> {
+const productRepository = new ProductRepository();
+const stockRepository = new StockRepository();
+const productService = new ProductService(productRepository, stockRepository);
+
+export default async function (event: { id: string }) {
+  console.log("getProductById", event);
+
   const { id } = event;
-  const product = await getProductById(id);
-
-  if (!product) {
-    throw new Error(`NotFound`);
-  }
-
-  return product;
+  return productService.getProduct(id);
 }
