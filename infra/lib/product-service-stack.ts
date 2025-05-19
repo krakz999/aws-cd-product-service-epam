@@ -1,10 +1,8 @@
-import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as cdk from "aws-cdk-lib";
 import * as apigateway from "aws-cdk-lib/aws-apigateway";
-import * as path from "path";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import { Construct } from "constructs";
-import { fileURLToPath } from "url";
+import { createLambda } from "./utils/create-lambda";
 
 export class ProductServiceStack extends cdk.Stack {
   private productTable: dynamodb.Table;
@@ -34,15 +32,24 @@ export class ProductServiceStack extends cdk.Stack {
     });
 
     // Create lambdas
-    const getProductsLambda = this.createLambda("getProducts");
+    const getProductsLambda = createLambda(this, "getProducts", {
+      PRODUCTS_TABLE_NAME: this.productTable.tableName,
+      STOCK_TABLE_NAME: this.stockTable.tableName,
+    });
     this.productTable.grantReadData(getProductsLambda);
     this.stockTable.grantReadData(getProductsLambda);
 
-    const getProductByIdLambda = this.createLambda("getProductById");
+    const getProductByIdLambda = createLambda(this, "getProductById", {
+      PRODUCTS_TABLE_NAME: this.productTable.tableName,
+      STOCK_TABLE_NAME: this.stockTable.tableName,
+    });
     this.productTable.grantReadData(getProductByIdLambda);
     this.stockTable.grantReadData(getProductByIdLambda);
 
-    const createProductLambda = this.createLambda("createProduct");
+    const createProductLambda = createLambda(this, "createProduct", {
+      PRODUCTS_TABLE_NAME: this.productTable.tableName,
+      STOCK_TABLE_NAME: this.stockTable.tableName,
+    });
     this.productTable.grantWriteData(createProductLambda);
     this.stockTable.grantWriteData(createProductLambda);
 
@@ -177,22 +184,6 @@ export class ProductServiceStack extends cdk.Stack {
           },
         },
       ],
-    });
-  }
-
-  private createLambda(name: string): lambda.Function {
-    return new lambda.Function(this, name, {
-      runtime: lambda.Runtime.NODEJS_20_X,
-      memorySize: 1024,
-      timeout: cdk.Duration.seconds(5),
-      handler: `${name}/index.default`,
-      code: lambda.Code.fromAsset(
-        path.join(path.dirname(fileURLToPath(import.meta.url)), "../resources")
-      ),
-      environment: {
-        PRODUCTS_TABLE_NAME: this.productTable.tableName,
-        STOCK_TABLE_NAME: this.stockTable.tableName,
-      },
     });
   }
 }
