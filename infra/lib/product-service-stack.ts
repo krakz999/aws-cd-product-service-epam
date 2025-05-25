@@ -9,6 +9,7 @@ import { SqsEventSource } from "aws-cdk-lib/aws-lambda-event-sources";
 export class ProductServiceStack extends cdk.Stack {
   private productTable: dynamodb.Table;
   private stockTable: dynamodb.Table;
+  public readonly catalogItemsQueue: sqs.Queue;
 
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
@@ -33,7 +34,7 @@ export class ProductServiceStack extends cdk.Stack {
       },
     });
 
-    const catalogItemsQueue = new sqs.Queue(this, "CatalogItemsQueue", {
+    this.catalogItemsQueue = new sqs.Queue(this, "CatalogItemsQueue", {
       queueName: "catalog-items-queue",
     });
 
@@ -49,7 +50,7 @@ export class ProductServiceStack extends cdk.Stack {
     this.stockTable.grantWriteData(catalogBatchProcessLambda);
 
     catalogBatchProcessLambda.addEventSource(
-      new SqsEventSource(catalogItemsQueue, {
+      new SqsEventSource(this.catalogItemsQueue, {
         batchSize: 5,
       })
     );
