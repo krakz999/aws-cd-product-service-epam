@@ -5,11 +5,14 @@ import { Construct } from "constructs";
 import { createLambda } from "./utils/create-lambda";
 import * as sqs from "aws-cdk-lib/aws-sqs";
 import { SqsEventSource } from "aws-cdk-lib/aws-lambda-event-sources";
+import * as sns from "aws-cdk-lib/aws-sns";
+import * as snsSubscriptions from "aws-cdk-lib/aws-sns-subscriptions";
 
 export class ProductServiceStack extends cdk.Stack {
   private productTable: dynamodb.Table;
   private stockTable: dynamodb.Table;
   public readonly catalogItemsQueue: sqs.Queue;
+  private createProductTopic: sns.Topic;
 
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
@@ -38,16 +41,27 @@ export class ProductServiceStack extends cdk.Stack {
       queueName: "catalog-items-queue",
     });
 
+    this.createProductTopic = new sns.Topic(this, "CreateProductTopic", {
+      topicName: "createProductTopic",
+      displayName: "Product Creation Notifications",
+    });
+
+    this.createProductTopic.addSubscription(
+      new snsSubscriptions.EmailSubscription("martin999b@gmail.com")
+    );
+
     const catalogBatchProcessLambda = createLambda(
       this,
       "catalogBatchProcess",
       {
         PRODUCTS_TABLE_NAME: this.productTable.tableName,
         STOCK_TABLE_NAME: this.stockTable.tableName,
+        CREATE_PRODUCT_TOPIC_ARN: this.createProductTopic.topicArn,
       }
     );
     this.productTable.grantWriteData(catalogBatchProcessLambda);
     this.stockTable.grantWriteData(catalogBatchProcessLambda);
+    this.createProductTopic.grantPublish(catalogBatchProcessLambda);
 
     catalogBatchProcessLambda.addEventSource(
       new SqsEventSource(this.catalogItemsQueue, {
