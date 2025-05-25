@@ -3,6 +3,8 @@ import * as apigateway from "aws-cdk-lib/aws-apigateway";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import { Construct } from "constructs";
 import { createLambda } from "./utils/create-lambda";
+import * as sqs from "aws-cdk-lib/aws-sqs";
+import { SqsEventSource } from "aws-cdk-lib/aws-lambda-event-sources";
 
 export class ProductServiceStack extends cdk.Stack {
   private productTable: dynamodb.Table;
@@ -30,6 +32,27 @@ export class ProductServiceStack extends cdk.Stack {
         allowMethods: ["GET"],
       },
     });
+
+    const catalogItemsQueue = new sqs.Queue(this, "CatalogItemsQueue", {
+      queueName: "catalog-items-queue",
+    });
+
+    const catalogBatchProcessLambda = createLambda(
+      this,
+      "catalogBatchProcess",
+      {
+        PRODUCTS_TABLE_NAME: this.productTable.tableName,
+        STOCK_TABLE_NAME: this.stockTable.tableName,
+      }
+    );
+    this.productTable.grantWriteData(catalogBatchProcessLambda);
+    this.stockTable.grantWriteData(catalogBatchProcessLambda);
+
+    catalogBatchProcessLambda.addEventSource(
+      new SqsEventSource(catalogItemsQueue, {
+        batchSize: 5,
+      })
+    );
 
     // Create lambdas
     const getProductsLambda = createLambda(this, "getProducts", {
